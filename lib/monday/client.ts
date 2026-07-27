@@ -166,7 +166,12 @@ export class MondayClient {
           }
         `;
 
-        const data = await this.graphql<{
+        const data: {
+          next_items_page: {
+            cursor: string | null;
+            items: MondayItem[];
+          };
+        } = await this.graphql<{
           next_items_page: {
             cursor: string | null;
             items: MondayItem[];
@@ -174,10 +179,10 @@ export class MondayClient {
         }>(query, {
           cursor,
         });
+        if (data.next_items_page.items)
+          items.push(...data.next_items_page.items);
 
-        items.push(...data.next_items_page.items);
-
-        cursor = data.next_items_page.cursor;
+        if (data.next_items_page.cursor) cursor = data.next_items_page.cursor;
       } else {
         const query = `
           query ($boardId: [ID!]) {
