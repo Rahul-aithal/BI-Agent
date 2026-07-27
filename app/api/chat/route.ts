@@ -1,10 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { auth } from "@/auth";
 import { agent } from "@/lib/agent";
-import { sessions } from "@/lib/agent/session";
+import { getChatHistory, saveChatHistory } from "@/lib/chatSessions";
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth();
+    const userEmail = session?.user?.email;
+
+    if (!userEmail) {
+      return NextResponse.json(
+        {
+          error: "Unauthorized",
+        },
+        {
+          status: 401,
+        },
+      );
+    }
+
     const { sessionId, message } = await req.json();
 
     if (!message) {
@@ -20,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     const sid = sessionId ?? "default";
 
-    const history = sessions.get(sid) ?? [];
+    const history = await getChatHistory(userEmail, sid);
 
     history.push({
       role: "user",
@@ -34,7 +49,7 @@ export async function POST(req: NextRequest) {
       content: reply,
     });
 
-    sessions.set(sid, history);
+    await saveChatHistory(userEmail, sid, history);
 
     return NextResponse.json({
       reply,
