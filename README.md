@@ -1,5 +1,27 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Environment variables
+
+Create a `.env.local` file with:
+
+```bash
+GEMINI_API_KEY=...
+MONDAY_API_TOKEN=...
+MONDAY_DEALS_BOARD_ID=...
+MONDAY_WORK_ORDERS_BOARD_ID=...
+MONGODB_URI=...
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+NEXTAUTH_SECRET=...
+NEXTAUTH_URL=http://localhost:3000
+```
+
+Google OAuth callback URL:
+
+```bash
+http://localhost:3000/api/auth/callback/google
+```
+
 ## Getting Started
 
 First, run the development server:
