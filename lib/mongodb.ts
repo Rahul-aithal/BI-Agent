@@ -9,7 +9,6 @@ if (!uri) {
 const options = {};
 
 declare global {
-  // eslint-disable-next-line no-var
   var mongoClientPromise: Promise<MongoClient> | undefined;
 }
 
