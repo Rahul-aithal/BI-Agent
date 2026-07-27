@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { signIn, signOut, useSession } from "next-auth/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -21,7 +22,11 @@ const suggestions = [
 ];
 
 export default function HomePage() {
-  const sessionId = useMemo(() => crypto.randomUUID(), []);
+  const fallbackSessionId = useMemo(() => crypto.randomUUID(), []);
+  const { data: session, status } = useSession();
+  const sessionId = session?.user?.email ?? fallbackSessionId;
+  const isAuthenticated = status === "authenticated";
+  const isSessionLoading = status === "loading";
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -32,6 +37,7 @@ export default function HomePage() {
   const { isLoading: healthLoading, isError: healthError } = useQuery({
     queryKey: ["health"],
     queryFn: health,
+    enabled: isAuthenticated,
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -69,6 +75,8 @@ export default function HomePage() {
   }, [messages, mutation.isPending]);
 
   async function send(text?: string) {
+    if (!isAuthenticated) return;
+
     const message = (text ?? input).trim();
 
     if (!message) return;
@@ -108,27 +116,67 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono text-[#8fa39a]">
-            <div
-              className={`h-2 w-2 rounded-full ${
-                healthLoading
-                  ? "bg-gray-500"
-                  : healthError
-                    ? "bg-red-500"
-                    : "bg-green-500"
-              }`}
-            />
+          <div className="flex items-center gap-3 text-xs font-mono text-[#8fa39a]">
+            {isAuthenticated ? (
+              <>
+                <div
+                  className={`h-2 w-2 rounded-full ${
+                    healthLoading
+                      ? "bg-gray-500"
+                      : healthError
+                        ? "bg-red-500"
+                        : "bg-green-500"
+                  }`}
+                />
 
-            {healthLoading
-              ? "checking connection..."
-              : healthError
-                ? "connection issue"
-                : "connected to monday.com"}
+                {healthLoading
+                  ? "checking connection..."
+                  : healthError
+                    ? "connection issue"
+                    : "connected to monday.com"}
+              </>
+            ) : (
+              "sign in required"
+            )}
+
+            {session?.user?.email && <span>{session.user.email}</span>}
+
+            {isAuthenticated ? (
+              <button
+                onClick={() => signOut()}
+                className="rounded border border-[#33443a] px-3 py-1 text-[#d5ddd8] transition hover:border-orange-500"
+              >
+                Sign out
+              </button>
+            ) : (
+              <button
+                onClick={() => signIn("google")}
+                disabled={isSessionLoading}
+                className="rounded border border-orange-600 px-3 py-1 text-orange-300 transition hover:border-orange-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSessionLoading ? "Checking..." : "Sign in with Google"}
+              </button>
+            )}
           </div>
         </div>
       </header>
 
       <main className="flex-1 overflow-y-auto">
+        {!isAuthenticated ? (
+          <div className="mx-auto mt-20 max-w-xl rounded-xl border border-[#223028] bg-[#131c18] p-8 text-center">
+            <h2 className="text-lg font-semibold">Sign in to continue</h2>
+            <p className="mt-3 text-sm text-[#8fa39a]">
+              Use your Google account to access the BI Agent.
+            </p>
+            <button
+              onClick={() => signIn("google")}
+              disabled={isSessionLoading}
+              className="mt-6 rounded-lg bg-orange-500 px-5 py-3 font-semibold text-black transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Continue with Google
+            </button>
+          </div>
+        ) : (
         <div className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
           {messages.length === 0 && (
             <div className="mt-10">
@@ -202,6 +250,7 @@ export default function HomePage() {
 
           <div ref={bottomRef} />
         </div>
+        )}
       </main>
       <footer className="border-t border-[#223028] bg-[#0e1512] px-5 py-5">
         <div className="mx-auto flex max-w-4xl items-end gap-3">
@@ -209,7 +258,7 @@ export default function HomePage() {
             rows={1}
             value={input}
             placeholder="Ask a business question... (Shift + Enter for newline)"
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || !isAuthenticated}
             onChange={(e) => {
               setInput(e.target.value);
 
@@ -245,7 +294,7 @@ export default function HomePage() {
           />
 
           <button
-            disabled={mutation.isPending || !input.trim()}
+            disabled={mutation.isPending || !input.trim() || !isAuthenticated}
             onClick={() => send()}
             className="
               h-12
