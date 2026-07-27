@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { signIn, signOut, useSession } from "next-auth/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -21,6 +22,8 @@ const suggestions = [
 ];
 
 export default function HomePage() {
+  const { data: session, status } = useSession();
+
   const sessionId = useMemo(() => crypto.randomUUID(), []);
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -62,6 +65,8 @@ export default function HomePage() {
     },
   });
 
+  const isAuthenticated = status === "authenticated";
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({
       behavior: "smooth",
@@ -69,6 +74,8 @@ export default function HomePage() {
   }, [messages, mutation.isPending]);
 
   async function send(text?: string) {
+    if (!isAuthenticated) return;
+
     const message = (text ?? input).trim();
 
     if (!message) return;
@@ -108,28 +115,58 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono text-[#8fa39a]">
-            <div
-              className={`h-2 w-2 rounded-full ${
-                healthLoading
-                  ? "bg-gray-500"
-                  : healthError
-                    ? "bg-red-500"
-                    : "bg-green-500"
-              }`}
-            />
+          <div className="flex items-center gap-3">
+            {isAuthenticated ? (
+              <>
+                <div className="text-xs text-[#8fa39a]">
+                  {session.user?.name ?? session.user?.email}
+                </div>
 
-            {healthLoading
-              ? "checking connection..."
-              : healthError
-                ? "connection issue"
-                : "connected to monday.com"}
+                <button
+                  onClick={() => signOut()}
+                  className="rounded-lg border border-[#223028] px-3 py-1.5 text-xs font-semibold text-[#8fa39a] transition hover:border-orange-600 hover:text-orange-400"
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => signIn("google")}
+                className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-orange-400"
+              >
+                Sign in with Google
+              </button>
+            )}
+
+            <div className="flex items-center gap-2 text-xs font-mono text-[#8fa39a]">
+              <div
+                className={`h-2 w-2 rounded-full ${
+                  healthLoading
+                    ? "bg-gray-500"
+                    : healthError
+                      ? "bg-red-500"
+                      : "bg-green-500"
+                }`}
+              />
+
+              {healthLoading
+                ? "checking connection..."
+                : healthError
+                  ? "connection issue"
+                  : "connected to monday.com"}
+            </div>
           </div>
         </div>
       </header>
 
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
+          {!isAuthenticated && (
+            <div className="rounded-xl border border-[#223028] bg-[#131c18] px-5 py-4 text-sm text-[#8fa39a]">
+              Please sign in with Google to use the BI agent.
+            </div>
+          )}
+
           {messages.length === 0 && (
             <div className="mt-10">
               <p className="leading-7 text-[#8fa39a]">
@@ -142,6 +179,7 @@ export default function HomePage() {
                   <button
                     key={question}
                     onClick={() => send(question)}
+                    disabled={!isAuthenticated}
                     className="block w-full rounded-lg border border-[#223028] bg-[#131c18] px-4 py-3 text-left text-sm transition hover:border-orange-600 hover:bg-[#172018]"
                   >
                     {question}
@@ -209,7 +247,7 @@ export default function HomePage() {
             rows={1}
             value={input}
             placeholder="Ask a business question... (Shift + Enter for newline)"
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || !isAuthenticated}
             onChange={(e) => {
               setInput(e.target.value);
 
@@ -245,7 +283,7 @@ export default function HomePage() {
           />
 
           <button
-            disabled={mutation.isPending || !input.trim()}
+            disabled={mutation.isPending || !input.trim() || !isAuthenticated}
             onClick={() => send()}
             className="
               h-12
